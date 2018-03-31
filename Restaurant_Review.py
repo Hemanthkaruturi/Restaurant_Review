@@ -10,6 +10,7 @@ Created on Fri Mar 23 19:25:07 2018
 #NLTK Project
 import pandas as pd
 import numpy as np
+from tqdm import tqdm
 
 #Importing data
 data = pd.read_csv('Restaurant_Reviews.tsv', delimiter = '\t', quoting = 3)
@@ -17,12 +18,12 @@ data = pd.read_csv('Restaurant_Reviews.tsv', delimiter = '\t', quoting = 3)
 #Cleaning the data
 import re
 import nltk
-nltk.download('stopwords')
+#nltk.download('stopwords')
 from nltk.corpus import stopwords
 from nltk.stem.porter import PorterStemmer
 corpus = []                                                                         #Any kind of text generally called corpus
-for i in range(0,len(data)):
-    review = re.sub('[^a-zA-Z]',' ',data['Review'][i])                                  #Removing all the characters except a to z
+for review in tqdm(data['Review']):
+    review = re.sub('[^a-zA-Z]',' ', review)                                  #Removing all the characters except a to z
     review = review.lower()                                                             #Converting Capital Letters into lower case
     review = review.split()                                                             #Splitting sentence into individual words
     ps = PorterStemmer()                                                                #Stemming   (love = loved, loving, lovable, lover, lovely, ...)
@@ -30,11 +31,14 @@ for i in range(0,len(data)):
     review = " ".join(review)                                                            #Joining the individual words to a sentence)
     corpus.append(review)             
     
-#Creating the Bag of words model
-from sklearn.feature_extraction.text import CountVectorizer
-cv = CountVectorizer(max_features = 1500)
-X = cv.fit_transform(corpus).toarray()          #This will create a sparse matix of zero's(count on number of times word repeated) and then it converts into array    
-y = data.iloc[:, 1].values                      #Taking Target variable
+#Creating the Bag of words model with tf-idf
+from sklearn.feature_extraction.text import TfidfVectorizer
+tfidf = TfidfVectorizer(min_df=2, max_df=0.5, ngram_range=(1,2))
+features = tfidf.fit_transform(corpus)
+X = pd.DataFrame(features.todense(),
+            columns=tfidf.get_feature_names()
+            )
+y = data['Liked'].values
 
 #Building the machine learning model
 
@@ -52,12 +56,6 @@ rf_classifier.fit(X_train, y_train)
 from sklearn.naive_bayes import GaussianNB
 nb_classifier = GaussianNB()
 nb_classifier.fit(X_train, y_train)
-
-# Fitting Decision Tree Classification to the Training set
-from sklearn.tree import DecisionTreeClassifier
-dt_classifier = DecisionTreeClassifier(criterion = 'entropy', random_state = 0)
-dt_classifier.fit(X_train, y_train)
-
 
 ####################### ANN ########################################
 # Importing the Keras libraries and packages
@@ -94,14 +92,12 @@ ann_classifier.fit(X_train, y_train, batch_size = 10, nb_epoch = 100)
 # Predicting the Test set results
 rf_pred = rf_classifier.predict(X_test)
 nb_pred = nb_classifier.predict(X_test)
-dt_pred = dt_classifier.predict(X_test)
 
 ann_pred = ann_classifier.predict(X_test)
 ann_pred = (ann_pred > 0.5)
 
 # Making the Confusion Matrix
 from sklearn.metrics import confusion_matrix
-cm_rf = confusion_matrix(y_test, rf_pred)                       #72% accuracy
+cm_rf = confusion_matrix(y_test, rf_pred)                       #70% accuracy
 cm_nb = confusion_matrix(y_test, nb_pred)                       #73% accuracy
-cm_dt = confusion_matrix(y_test, dt_pred)                       #71% accuracy
-cm_ann = confusion_matrix(y_test, ann_pred)                     #71.5% accuracy
+cm_ann = confusion_matrix(y_test, ann_pred)                     #74.5% accuracy
